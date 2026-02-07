@@ -11,28 +11,35 @@ from flask import Flask
 from threading import Thread
 import os
 
+
 # Configuração de Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('GameBot')
 
+
 # --- CONFIGURAÇÃO DO SERVIDOR WEB PARA O RENDER ---
 app = Flask('')
+
 
 @app.route('/')
 def home():
     return "Bot está Online!"
+
 
 def run_web_server():
     # O Render fornece a porta na variável de ambiente PORT
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
+
 def keep_alive():
     t = Thread(target=run_web_server)
     t.start()
 
+
 # --------------------------------------------------
-TOKEN = "MTQ2OTY0ODcxMTYyNDgyMjg3Nw.GXGtcp.5GnuMIU-BbUVrmQe-TFFZOBIAdY7iQRQ6EHv-I"
+TOKEN = "MTQ2OTY0ODcxMTYyNDgyMjg3Nw.G1mPt0.C1xC3PFlzThWE5GWXbbFvwJz4XhMYNqFuZvNYY"
+
 
 class GameBot(discord.Client):
     def __init__(self):
@@ -40,11 +47,14 @@ class GameBot(discord.Client):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
+
     async def setup_hook(self):
         await self.tree.sync()
 
+
 client = GameBot()
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+
 
 def scrape_site(base_url, query):
     try:
@@ -84,53 +94,3 @@ def scrape_site(base_url, query):
         
         # Imagem
         img_tag = game_soup.find('img', class_=re.compile(r'wp-post-image|featured'))
-        image_url = img_tag['src'] if img_tag else None
-        
-        return {
-            'title': title,
-            'size': size,
-            'links': "\n".join(links[:3]) if links else "Links não encontrados diretamente.",
-            'instructions': instructions,
-            'image': image_url
-        }
-    except Exception as e:
-        logger.error(f"Erro ao raspar {base_url}: {e}")
-        return None
-
-@client.tree.command(name="jogos", description="Busca links de download para um jogo")
-async def jogos(interaction: discord.Interaction, nome: str):
-    await interaction.response.defer()
-    
-    sites = [
-        "https://repack-games.com",
-        "https://ankergames.net",
-        "https://steamrip.com"
-    ]
-    
-    found_game = None
-    for site in sites:
-        result = await asyncio.get_event_loop().run_in_executor(executor, scrape_site, site, nome)
-        if result:
-            found_game = result
-            break
-            
-    if found_game:
-        embed = discord.Embed(title=found_game['title'], color=discord.Color.blue())
-        embed.add_field(name="📦 Tamanho", value=found_game['size'], inline=True)
-        embed.add_field(name="🔗 Links de Download", value=found_game['links'], inline=False)
-        embed.add_field(name="🛠️ Instruções", value=found_game['instructions'], inline=False)
-        if found_game['image']:
-            embed.set_image(url=found_game['image'])
-        
-        await interaction.followup.send(embed=embed)
-    else:
-        await interaction.followup.send(f"Desculpe, não encontrei o jogo '{nome}' nos sites monitorados.")
-
-@client.event
-async def on_ready():
-    logger.info(f'Bot logado como {client.user}')
-    print(f'Bot logado como {client.user}')
-
-if __name__ == "__main__":
-    keep_alive()
-    client.run(TOKEN)
